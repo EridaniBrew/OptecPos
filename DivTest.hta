@@ -1,0 +1,105 @@
+<html>
+<head>
+<title>Optec Position Save</title>
+<HTA:APPLICATION 
+     ID="objOptecSave"
+     APPLICATIONNAME="Optec Position Save"
+     SCROLL="auto"
+     SINGLEINSTANCE="yes"
+>
+<STYLE type="text/css">
+body,html{
+  height: 100%;
+}
+#OuterDiv{
+  width:100%;
+  height:100%;   
+  position: relative;
+}
+#Header{
+  width: 100%;
+  background: SlateBlue;
+  padding:  10px 0 10px 0;
+}
+#OptecTitle{
+  font-size: large;
+  color: LightBlue;
+}
+.NewLabel{
+  clear: both;
+  margins: 10px 0 5px 0;
+  padding: 10px 0 5px 0;
+}
+
+#progressBar{
+  background: green;
+}
+#currentPos{
+  background: LightGreen;
+  font-size: medium;
+}
+#Buttons{
+  width: 200px;
+  float: left;
+}
+.leftButton{
+  clear:both;
+  float:left;
+  width: 100%;
+  background: red;
+}
+#txtGoToPos{
+  float: left;
+}
+
+#LogDiv{
+  clear: both;
+  float:left;
+  position: absolute;
+  width:100%;
+  min-height:  70%;
+  height:70%;
+  overflow: hidden;
+}
+#LogMsg{
+  float:bottom;
+  width:100%;
+  min-height:  100%;
+  height:100%;
+}
+</STYLE>
+</head>
+
+<body>
+
+
+<form>
+<div id="OuterDiv">
+<div id=Header>
+<center><span id="OptecTitle" >Optec Position Save</span></center>
+</div>
+<span id="progressBar">></span>
+
+<div id="Buttons">
+<input class="leftButton" type="button" name="btnGoToPos" value="Move to this Position: " 
+onclick="GoToPos_onClick" />
+<input class="leftButton" type="button" name="btnSavePos" value="Save Optec Position" 
+onclick="SavePos_onClick"  />
+</div>
+<input id="txtGoToPos" type="text" value="3500" name="txtGoToPos" >
+
+<div class="NewLabel">Current Position:
+<span id="currentPos" >xxxx</span></div>
+
+<div class="NewLabel">Log<br/></div>
+
+<div id="LogDiv">
+<textarea id="LogMsg" name="LogMsgArea"  ></textarea>
+</div>
+
+</div>
+</form>
+
+
+</body>
+</html>

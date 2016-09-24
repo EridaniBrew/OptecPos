@@ -1,0 +1,362 @@
+<html>
+<head>
+<title>Optec Position Save</title>
+<HTA:APPLICATION 
+     ID="objOptecSave"
+     APPLICATIONNAME="Optec Position Save"
+     SCROLL="auto"
+     SINGLEINSTANCE="yes"
+>
+<STYLE type="text/css">
+body,html{
+  height: 100%;
+}
+#OuterDiv{
+  width:100%;
+  height:100%;   
+  position: relative;
+}
+#Header{
+  width: 100%;
+  background: SlateBlue;
+  padding:  10px 0 10px 0;
+}
+#OptecTitle{
+  font-size: large;
+  color: LightBlue;
+}
+.NewLabel{
+  clear: both;
+  margins: 10px 0 5px 0;
+  padding: 10px 0 5px 0;
+}
+
+#progressBar{
+  background: green;
+}
+#currentPos{
+  background: LightGreen;
+  font-size: medium;
+}
+#Buttons{
+  width: 200px;
+  float: left;
+}
+.leftButton{
+  clear:both;
+  float:left;
+  width: 100%;
+  background: red;
+}
+#txtGoToPos{
+  float: left;
+}
+
+#LogDiv{
+  clear: both;
+  float:left;
+  position: absolute;
+  width:100%;
+  min-height:  55%;
+  height:55%;
+  overflow: hidden;
+}
+#LogMsg{
+  float:bottom;
+  width:100%;
+  min-height:  100%;
+  height:100%;
+}
+</STYLE>
+</head>
+
+<SCRIPT LANGUAGE="VBScript">
+' When the Optec is powered off using the Power switch, it saves its current position to memory.
+' When it is started up later, it repositions to the saved position.
+' Unfortunately, if power is removed from the Optec (using the net power switch, for example)
+' the position is not saved.
+'
+' This utility simply sasves the current Optec position to memory so it later will resume 
+' at that position.
+
+' Commands to be sent:
+' FMMODE     	Returns ! LF CR
+' FSLEEP	Returns ZZZ   	Does the save position to memory
+' FWAKUP	Returns WAKE
+' FFMODE	Returns END
+
+    CONST COMM_PORT = 5              ' Com port
+    Const CMD_MANUAL = "FMMODE"
+    Const CMD_MANUAL_RETURN = "!"
+    Const CMD_SLEEP = "FSLEEP"
+    Const CMD_SLEEP_RETURN = "ZZZ"
+    Const CMD_WAKE = "FWAKEE"
+    Const CMD_WAKE_RETURN = "WAKE"
+    Const CMD_END = "FFMODE"
+    Const CMD_END_RETURN = "END"
+    Const CMD_GET_POS = "FPOSRO"
+
+    Dim comm
+
+    dim objShell                ' used to run external programs
+
+    Sub Window_OnLoad
+	'    Set objShell = CreateObject("Shell.Application")
+        window.resizeTo 800,720
+
+        ' Connect to Optec - open serial port
+        set comm = CreateObject ("MSCOMMLib.MSComm")
+        comm.CommPort = COMM_PORT
+        comm.Settings = "19200,N,8,1"
+        comm.InputLen = 0
+        on error resume next
+        comm.PortOpen = True
+        if (Err) then
+            LogMyMsg (Err.Description)
+        else
+            LogMyMsg ("Comm Port Opened")
+            ScreenState (False)    ' disable buttons
+            if (StartConversation() = True) then
+                GetCurrPos()
+
+                ' Issue FFMODE to end communications
+                if (Not EndConversation()) then
+                    LogMyMsg ("EndConversation: FFMODE failed")
+                end if
+            end if
+            ScreenState (True)
+        end if
+
+    End Sub
+
+    Sub ScreenState (active)
+        ' active = True to enable buttons, false to disable
+        document.GetElementByID("btnGoToPos").disabled = not active
+        document.GetElementByID("btnSavePos").disabled = not active
+    End Sub
+
+    Sub Window_OnUnload
+        ' Close COM port
+        comm.PortOpen = False
+        LogMyMsg ("Comm Port Closed")
+    End Sub
+
+
+    Function EndConversation()
+        Dim rets     ' return string
+        
+        LogMyMsg ("EndConv ")
+        rets = SendReceive (CMD_END)
+        EndConversation = (mid(rets,1,len(CMD_END_RETURN)) = CMD_END_RETURN)
+    End Function
+
+    Function StartConversation()
+        Dim rets     ' return string
+        Dim s
+        Dim loopcnt 
+
+        loopcnt = 1
+        rets = "xxxxxxxxxx"
+        do until (mid(rets,1,len(CMD_MANUAL_RETURN)) = CMD_MANUAL_RETURN)
+            s = "StartConv try " & CStr(loopcnt)
+            LogMyMsg(s)
+            rets = SendReceive (CMD_MANUAL)
+            loopcnt = loopcnt + 1
+            if (loopcnt > 10) then
+               StartConversation = False
+               Exit Function
+            end if
+        loop
+        StartConversation = True
+    End Function
+
+    Function SendReceive(outmsg)
+        comm.Output = outmsg & Chr(10) & Chr(13)
+        LogMyMsg ("  Sent string {" & outmsg & "}")
+        s = ""
+        count = 1
+        do while (len(s) < 3)
+            s = comm.input
+            bumpProgress()
+            Sleep (500)
+            count = count + 1
+            if (count > 60) then
+                s = "ERROR  "
+            end if
+        loop
+        
+        s = mid(s,1,len(s)-2)
+        LogMyMsg("  Received string {" & s & "}")
+        ClearProgress()
+        SendReceive = s
+    End Function
+
+	
+    Function GetCurrPos()
+        rets = SendReceive (CMD_GET_POS)	
+        ' Return string is formatted P=nnnn LF CR
+        thePos = CInt(mid(rets,3,4))
+        LogMyMsg ("Current Position is " & thePos)
+
+        currentPos.InnerHTML = FormatNumber(thePos,0,0,0,0)
+        GetCurrPos = thePos
+    End Function
+	
+' Store Optec position by putting it into Sleep mode.
+    Sub StoreOptecPosition()
+        rets = SendReceive (CMD_SLEEP)	
+    End Sub
+
+' Wake the Optec back up after going into sleep mode
+    Sub WakeUpOptec()
+        rets = SendReceive (CMD_WAKE)	
+    End Sub
+
+' Move the Optec to the target position
+    Sub MoveToPos()
+        Dim thePos, curPos
+        Dim cmd
+        Dim rets
+        Dim delta
+
+        thePos = Cint(document.GetElementByID("txtGoToPos").Value)
+        curPos = GetCurrPos()
+        if ((thePos > curPos) and (thePos <7000)) then
+	    ' Move Out
+            delta = thePos - curPos
+            cmd = "FO" & make4Digit (delta)
+            rets = SendReceive (cmd)
+        elseif ((thePos < curPos) and (thePos > 0)) then
+            ' Move In
+            delta = curPos - thePos
+            cmd = "FI" & make4Digit (delta)
+            rets = SendReceive (cmd)
+        end if
+        ' Update position
+        GetCurrPos()
+    end sub
+
+    Function make4Digit (delta)
+        Dim s
+        Dim leadZero
+
+        s = CStr (delta)
+        leadZero = String(4-len(s), "0")
+
+        'alert ("make4Digit is {" & leadZero & s & "}")
+        make4Digit = leadZero & s
+    End Function
+
+
+
+    sub LogMyMsg(s)
+
+        ' orig LogMsg.InnerHTML = logmsg.innerHTML & "<br>" & s
+        LogMsg.Value = LogMsg.Value & chr(13) & s
+        LogMsg.doScroll("pageDown")
+    end sub
+
+    Sub ClearLog()
+        ' LogMsg.InnerHTML = ""
+        LogMyMsg("============================================")
+    end sub
+
+    Sub ClearProgress()
+        progressBar.InnerHTML = ">"
+    end sub
+
+    Sub bumpProgress()
+        progressBar.InnerHTML = progressBar.innerHTML & "." 
+    end sub
+
+' Sleep function from internet
+Sub Sleep(MSecs) 
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If Fso.FileExists("sleeper.vbs")=False Then
+        Set objOutputFile = fso.CreateTextFile("sleeper.vbs", True)
+        objOutputFile.Write "wscript.sleep WScript.Arguments(0)"
+        objOutputFile.Close
+    End If
+
+    CreateObject("WScript.Shell").Run "sleeper.vbs " & MSecs,1 , True
+End Sub
+
+
+' SavePos button callback
+Sub SavePos_onClick
+    ' Issue FMMODE to start communications
+    ScreenState (False)
+    ClearLog()
+    if (StartConversation() = True) then
+        GetCurrPos()
+
+        ' Issue Sleep to store pos
+        StoreOptecPosition()
+        Sleep (1000)
+
+        ' Issue Wakup to pull back out of sleep
+        WakeUpOptec()
+        
+        ' Issue FFMODE to end communications
+        if (Not EndConversation()) then
+            LogMyMsg ("EndConversation: FFMODE failed")
+        end if
+    else
+        ' Conversation could not be started
+        LogMyMsg("StartConversation failed (FMMODE)")
+    end if
+    ScreenState (True)
+End Sub
+
+Sub GoToPos_onClick
+    ' Issue FMMODE to start communications
+    ScreenState (False)
+    ClearLog()
+    if (StartConversation() = True) then
+
+        MoveToPos()
+
+        ' Issue FFMODE to end communications
+        if (Not EndConversation()) then
+            LogMyMsg ("EndConversation: FFMODE failed")
+        end if
+    else
+        ' Conversation could not be started
+        LogMyMsg("StartConversation failed (FMMODE)")
+    end if
+    ScreenState (True)
+End Sub
+
+</SCRIPT>
+
+<body>
+<form>
+<div id="OuterDiv">
+<div id=Header>
+<center><span id="OptecTitle" >Optec Position Save</span></center>
+</div>
+<span id="progressBar">></span>
+
+<div id="Buttons">
+<input class="leftButton" type="button" name="btnGoToPos" value="Move to this Position: " 
+onclick="GoToPos_onClick" />
+<input class="leftButton" type="button" name="btnSavePos" value="Save Optec Position" 
+onclick="SavePos_onClick"  />
+</div>
+<input id="txtGoToPos" type="text" value="3500" name="txtGoToPos" >
+
+<div class="NewLabel">Current Position:
+<span id="currentPos" >xxxx</span></div>
+
+<div class="NewLabel">Log<br/></div>
+</form>
+
+<div id="LogDiv">
+<textarea id="LogMsg" name="LogMsgArea"  ></textarea>
+</div>
+
+</div>
+
+
+</body>
+</html>

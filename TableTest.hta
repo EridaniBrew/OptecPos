@@ -1,0 +1,99 @@
+<html>
+<head>
+<title>Optec Position Save</title>
+<HTA:APPLICATION 
+     ID="objOptecSave"
+     APPLICATIONNAME="Optec Position Save"
+     SCROLL="auto"
+     SINGLEINSTANCE="yes"
+>
+<STYLE type="text/css">
+#OuterTable{
+  width:100%;
+  height:100%;   
+  background: cyan;
+}
+#TopTable{
+  background:red;
+}
+#progressBar{
+  background: green;
+}
+.leftButtonTD{
+  width:50%;
+  background: blue;
+}
+.leftButton{
+  width:100%;
+  background: cyan;
+}
+
+#LogTable{
+  width:100%;
+  height:100%;   /* % does nothing */
+  position:absolute;
+  bottom:0;
+  background:orange;
+}
+.logRow{
+  width:100%;
+  height:100%;
+  background:green;
+}
+#logTD{
+  width:100%; 
+  /* height:100px; */
+  background:pink;
+}
+#LogMsg{
+  width:100%;
+  height:100%;
+}
+
+</STYLE>
+</head>
+
+<body>
+
+
+<form>
+<table id="OuterTable">
+<tr style="background:yellow;"><td><center><span style="font-size: large;background:pink;">Optec Position Save</span></center></td></tr>
+<tr style="background:orange;"><td>
+<table id="TopTable">
+
+<tr>
+<td><span id="progressBar">>.........................................................<</span></td>
+</tr>
+
+<tr>
+<td class="leftButtonTD"><input class="leftButton" type="button" name="btnSavePos" value="Save Optec Position" 
+onclick="SavePos_onClick"  /></td>
+</tr>
+
+<tr>
+<td class="leftButtonTD"><input class="leftButton" type="button" name="btnGoToPos" value="Move to this Position: " 
+onclick="GoToPos_onClick" style="background: red;" /></td>
+<td ><input type="text" value="3500" name="txtGoToPos" ></td>
+</tr>
+<tr> <td style="width:50%">Current Position:</td>
+<td><span id="currentPos" style="font-size: large"></span></td></tr>
+</table info="end button table">
+</td></tr>
+
+<tr style="background:green;"><td>Log</td></tr>
+
+<tr><td>
+<table id="LogTable"  style="background:blue;">
+<tr class="logRow"> 
+<td id=logTD ><textarea id="LogMsg" name="LogMsgArea"  >
+  </textarea></td></tr>
+
+</table info="End Log Table">
+</td></tr>
+</table info="Outer Table">
+</form>
+
+
+</body>
+</html>
